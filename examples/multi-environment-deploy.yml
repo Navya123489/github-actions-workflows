@@ -1,0 +1,109 @@
+# multi-environment-deploy.yml
+# Demonstrates deploying to multiple environments in sequence
+# Dev → Staging → Production with approval gates
+
+name: Multi-Environment Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+jobs:
+  # Job 1 — Deploy to Dev automatically
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Dev
+        run: |
+          echo "================================================="
+          echo "Deploying to Development environment"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "================================================="
+          echo "Running deployment steps..."
+          echo "Deployment to Dev complete"
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests against Dev..."
+          echo "Health check: OK"
+          echo "API check: OK"
+          echo "Smoke tests passed"
+
+  # Job 2 — Deploy to Staging after Dev succeeds
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    environment: staging
+    needs: deploy-dev      # Only runs if deploy-dev succeeds
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Staging
+        run: |
+          echo "================================================="
+          echo "Deploying to Staging environment"
+          echo "Dev deployment verified"
+          echo "Commit: ${{ github.sha }}"
+          echo "================================================="
+          echo "Running deployment steps..."
+          echo "Deployment to Staging complete"
+
+      - name: Run integration tests
+        run: |
+          echo "Running integration tests against Staging..."
+          echo "Integration test 1: PASSED"
+          echo "Integration test 2: PASSED"
+          echo "Integration test 3: PASSED"
+          echo "All integration tests passed"
+
+  # Job 3 — Deploy to Production after Staging
+  deploy-prod:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment: prod
+    needs: deploy-staging   # Only runs if deploy-staging succeeds
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Production
+        run: |
+          echo "================================================="
+          echo "Deploying to Production environment"
+          echo "All pre-production checks passed"
+          echo "Commit: ${{ github.sha }}"
+          echo "================================================="
+          echo "Running production deployment..."
+          echo "Production deployment complete"
+
+      - name: Notify deployment complete
+        run: |
+          echo "================================================="
+          echo "Production deployment successful"
+          echo "Version: ${{ github.sha }}"
+          echo "Deployed by: ${{ github.actor }}"
+          echo "Time: $(date)"
+          echo "================================================="

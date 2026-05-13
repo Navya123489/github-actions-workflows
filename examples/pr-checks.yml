@@ -1,0 +1,105 @@
+# pr-checks.yml
+# Runs automated checks on every Pull Request
+# Ensures code quality before merging to main branch
+
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    types:
+      - opened        # PR opened
+      - synchronize   # New commits pushed to PR
+      - reopened      # PR reopened
+
+jobs:
+  code-checks:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1 — Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2 — Print PR information
+      - name: PR Information
+        run: |
+          echo "================================================="
+          echo "Pull Request Details"
+          echo "PR Number: ${{ github.event.number }}"
+          echo "PR Title: ${{ github.event.pull_request.title }}"
+          echo "Author: ${{ github.event.pull_request.user.login }}"
+          echo "Source Branch: ${{ github.head_ref }}"
+          echo "Target Branch: ${{ github.base_ref }}"
+          echo "================================================="
+
+      # Step 3 — Check PR title follows convention
+      - name: Check PR title
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          echo "Checking PR title: $PR_TITLE"
+          
+          # Check title is not empty
+          if [ -z "$PR_TITLE" ]; then
+            echo "ERROR: PR title cannot be empty"
+            exit 1
+          fi
+
+          # Check title length
+          if [ ${#PR_TITLE} -lt 10 ]; then
+            echo "ERROR: PR title too short — minimum 10 characters"
+            exit 1
+          fi
+
+          echo "PR title check passed"
+
+      # Step 4 — Check for merge conflicts marker
+      - name: Check for conflict markers
+        run: |
+          echo "Checking for merge conflict markers..."
+          if grep -r "<<<<<<< " . \
+            --include="*.tf" \
+            --include="*.yml" \
+            --include="*.py" \
+            -l; then
+            echo "ERROR: Merge conflict markers found"
+            exit 1
+          fi
+          echo "No conflict markers found"
+
+      # Step 5 — Validate YAML files
+      - name: Validate YAML files
+        run: |
+          echo "Validating YAML files..."
+          pip install pyyaml -q
+          python3 -c "
+          import yaml, os, sys
+          errors = []
+          for root, dirs, files in os.walk('.'):
+            dirs[:] = [d for d in dirs if d != '.git']
+            for file in files:
+              if file.endswith('.yml') or file.endswith('.yaml'):
+                filepath = os.path.join(root, file)
+                try:
+                  with open(filepath) as f:
+                    yaml.safe_load(f)
+                  print(f'Valid: {filepath}')
+                except yaml.YAMLError as e:
+                  errors.append(f'Invalid: {filepath} - {e}')
+          if errors:
+            for e in errors:
+              print(e)
+            sys.exit(1)
+          print('All YAML files are valid')
+          "
+
+      # Step 6 — Summary
+      - name: PR check summary
+        run: |
+          echo "================================================="
+          echo "All PR checks passed successfully"
+          echo "Ready for review and merge"
+          echo "================================================="
