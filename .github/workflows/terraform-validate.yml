@@ -1,0 +1,62 @@
+# terraform-validate.yml
+# Automatically validates Terraform code on every push
+# Catches syntax errors and misconfigurations before they reach production
+
+name: Terraform Validate
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - '**.tf'          # Only runs when .tf files change
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '**.tf'
+
+  workflow_dispatch:     # Allows manual trigger from GitHub UI
+
+jobs:
+  validate:
+    name: Validate Terraform
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1 — Download the code onto the runner
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2 — Install Terraform
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      # Step 3 — Check formatting
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+        working-directory: .
+        continue-on-error: true
+
+      # Step 4 — Initialise Terraform
+      - name: Terraform Init
+        run: terraform init -backend=false
+        working-directory: .
+
+      # Step 5 — Validate syntax and configuration
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: .
+
+      # Step 6 — Print success message
+      - name: Validation Summary
+        run: |
+          echo "================================================="
+          echo "Terraform validation completed successfully"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "================================================="

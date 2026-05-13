@@ -1,0 +1,96 @@
+# security-scan.yml
+# Scans code for security vulnerabilities and hardcoded secrets
+# Runs on every push and pull request
+
+name: Security Scan
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: '0 9 * * 1'    # Every Monday at 9am
+
+  workflow_dispatch:
+
+jobs:
+  secret-scan:
+    name: Scan for Secrets
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1 — Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0      # Full history for secret scanning
+
+      # Step 2 — Scan for hardcoded secrets
+      - name: Scan for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          extra_args: --only-verified
+
+  dependency-scan:
+    name: Scan Dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1 — Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2 — Run dependency vulnerability scan
+      - name: Dependency scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'HIGH,CRITICAL'
+          format: 'table'
+          exit-code: '0'        # Don't fail — just report
+
+      # Step 3 — Summary
+      - name: Security scan summary
+        run: |
+          echo "================================================="
+          echo "Security scan completed"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Scanned by: ${{ github.actor }}"
+          echo "================================================="
+
+  code-quality:
+    name: Code Quality Check
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1 — Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2 — Check for large files
+      - name: Check file sizes
+        run: |
+          echo "Checking for large files..."
+          find . -size +10M -not -path './.git/*' \
+            -exec echo "Large file found: {}" \;
+          echo "File size check complete"
+
+      # Step 3 — Check for sensitive file patterns
+      - name: Check for sensitive files
+        run: |
+          echo "Checking for sensitive files..."
+          sensitive_files=(".env" "*.pem" "*.key" "*.p12" "id_rsa")
+          for pattern in "${sensitive_files[@]}"; do
+            if find . -name "$pattern" \
+              -not -path './.git/*' | grep -q .; then
+              echo "WARNING: Sensitive file pattern found: $pattern"
+            fi
+          done
+          echo "Sensitive file check complete"

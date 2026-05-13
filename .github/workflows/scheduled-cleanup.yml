@@ -1,0 +1,61 @@
+# scheduled-cleanup.yml
+# Runs on a schedule to perform maintenance tasks
+# Demonstrates cron-based automation in GitHub Actions
+
+name: Scheduled Maintenance
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'    # Every Sunday at 2am
+
+  workflow_dispatch:         # Allow manual trigger
+
+jobs:
+  cleanup:
+    name: Repository Maintenance
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1 — Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2 — Check repository health
+      - name: Repository health check
+        run: |
+          echo "================================================="
+          echo "Weekly maintenance report"
+          echo "Date: $(date)"
+          echo "Repository: ${{ github.repository }}"
+          echo "================================================="
+
+      # Step 3 — Count files by type
+      - name: File statistics
+        run: |
+          echo "File statistics:"
+          echo "YAML files: $(find . -name '*.yml' \
+            -not -path './.git/*' | wc -l)"
+          echo "Terraform files: $(find . -name '*.tf' \
+            -not -path './.git/*' | wc -l)"
+          echo "Python files: $(find . -name '*.py' \
+            -not -path './.git/*' | wc -l)"
+          echo "Shell scripts: $(find . -name '*.sh' \
+            -not -path './.git/*' | wc -l)"
+
+      # Step 4 — Check for TODO comments
+      - name: Check for TODO items
+        run: |
+          echo "TODO items found in codebase:"
+          grep -r "TODO\|FIXME\|HACK" \
+            --include="*.yml" \
+            --include="*.py" \
+            --include="*.tf" \
+            -l . || echo "No TODO items found"
+
+      # Step 5 — Maintenance summary
+      - name: Maintenance summary
+        run: |
+          echo "================================================="
+          echo "Maintenance complete"
+          echo "Next run: Next Sunday at 2am"
+          echo "================================================="
